@@ -1,0 +1,181 @@
+<html>	
+    <head>
+        <title>Flask-SocketIO-Game: {{ room }}</title>
+        <script type="text/javascript" src="{{ url_for('static', filename='jquery-1.4.2.min.js') }}"></script>
+        <script type="text/javascript" src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
+        <script type="text/javascript" charset="utf-8">
+            var socket;
+            var score = 0;
+            var control_id = 0;
+            var control_ids = '0';
+            var id = -1;
+            var ids = "-1";
+            $(document).ready(function(){
+                socket = io.connect('http://' + document.domain + ':' + location.port + '/chat');
+                part1 = null;
+                part2 = null;
+                part3 = null;
+                fix = null;
+                initial = null;
+                myTurn = false;
+
+                $(window).bind('beforeunload', function() {
+	            refresh();
+	        });
+
+                socket.on('connect', function() {
+                    socket.emit('joined', {});
+                });
+                
+                socket.on('status', function(message) {
+                   if (id == -1) { 
+	               id = message.id;
+                       ids = id.toString();
+                       $('#yourId').text(ids);
+                       
+		   }
+                   control_id = message.control_id;
+                   console.log(control_id);
+                   control_ids = control_id.toString();
+                   $('#control_id').text(control_ids);
+                   $('#Messages').append(message.msg);
+                });
+ 
+                socket.on('question', function(data) {
+                    $('#Messages').text("");
+                    $('#Question').text(data.Q1);
+                    initial = data.Q1;
+                    console.log(data.Q1);
+                    myTurn = true;
+                    control_id = data.control_id
+                    control_ids = control_id.toString();
+                    $('#control_id').text(control_ids);
+                    var table = $('#chatList');
+                    table.find("tbody tr").remove();
+                });
+
+                socket.on('reply', function(data) {
+                    var row = '<tr>'+
+                        '<td>'+data.name+'</td>'+
+                        '<td>'+data.msg1+'</td>'+
+                        '<td>'+data.msg2+'</td>'+
+                        '<td>'+data.msg3+'</td>'+
+                        '<td>'+data.msg4+'</td>'+
+                    '</tr>';
+                    console.log(row);
+                    $('#chatList tbody').append(row);
+                });
+                $('#text1').keyup(function() {
+                    part1 = $('#text1').val();
+                    console.log(part1);
+                });
+                $('#text2').keyup(function() {
+                    part2 = $('#text2').val();
+                    console.log($('#text2').val());                   
+                });
+                $('#text3').keyup(function() {
+                    part3 = $('#text3').val();
+                    console.log($('#text3').val());
+                });                
+            });
+
+
+            function send_msg() {
+                if (myTurn == true) {
+                    var i = 0;
+                    score += $('#Correzione').val() ? parseInt($('#Correzione').val()) : 0;
+                    fix = $('#Correzione').val();
+                    console.log(fix);
+                    if (part1.toLowerCase().charAt(0) === initial.toLowerCase()) {
+                        score += 1;
+                    }
+                    if (part2.toLowerCase().charAt(0) === initial.toLowerCase()) {
+                        score += 1;
+                    }
+                    if (part3.toLowerCase().charAt(0) === initial.toLowerCase()) {
+                        score += 1;
+                    }
+                    $('#chatList tbody tr').each(function(){
+                        var currentRow=$(this);
+                        if (currentRow.find("td:eq(1)").text().toLowerCase() === part1.toLowerCase()) {
+                            i += 1;
+                        } 
+                        if (currentRow.find("td:eq(2)").text().toLowerCase() === part2.toLowerCase()) {
+                            i += 1;
+                        } 
+                        if (currentRow.find("td:eq(3)").text().toLowerCase() === part3.toLowerCase()) {
+                            i += 1;
+                        } 
+                    });
+                    if (i >= 3) { 
+                        score -= 3; 
+                    } else {
+                        score -= i;
+                    }
+                    socket.emit('text', {a0: id, a1: part1, a2: part2, a3: part3, a4: score, a5: fix});
+                    myTurn = false;
+                }
+            }
+
+
+
+            function send_qst() {
+		console.log(id, control_id);
+                if (id == control_id || id == 0) {
+                    socket.emit('test');
+                }
+            }   
+
+            function refresh() {
+                socket.emit('left', {id: id});
+            }
+
+            function leave_room() {
+                if (id == control_id) {
+                    socket.emit('test');
+                }
+                socket.emit('left', {id: id}, function() {
+		    id = -1;
+                    socket.disconnect();
+
+                    // go back to the login page
+                    window.location.href = "{{ url_for('main.index') }}";
+                });
+            }
+        </script>
+    </head>
+    <body>
+        <h1>Flask-SocketIO-Game: {{ room }}</h1>
+        <table id="chatList" style="width:100%">
+          <thead>
+            <tr>
+              <th><input id="Correzione" list="Valori">
+                  <datalist id="Valori">
+                    <option value=-1>
+                    <option value=-2>
+                    <option value=-3>
+                  </datalist></th>
+              <th>Given names</th>
+              <th>Objects</th>
+              <th>Cities</th>
+              <th id="Question"></th>
+            </tr>
+            <tr>
+              <th>Reply</th>            
+              <th><input id="text1"></th>
+              <th><input id="text2"></th>
+              <th><input id="text3"></th>
+              <th><button id="button1" onclick="send_msg();">Send</button></th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+        
+        <div>Your Id number: <a id="yourId"></a></div>
+        <div>Manager Id number: <a id="control_id"></a></div>
+        <div><button id="button2" onclick="send_qst();">Initial</button></div>
+        <a href="#" onclick="leave_room();">Leave this room</a>
+        <div id="Messages"></div>
+    </body>
+</html>
